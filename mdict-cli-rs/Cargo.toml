@@ -12,4 +12,5 @@ dirs = "5.0.1"
 mdict = { path = "../mdict" }
 tempfile = "3.8.1"
 walkdir = "2.4.0"
-html_parser = "0.7.0"
+scraper = "0.18.1"
+ego-tree = "0.6.2"

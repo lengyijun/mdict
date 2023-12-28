@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
-use html_parser::Dom;
+use ego_tree::NodeRef;
 use mdict::Mdx;
+use scraper::{Html, Node};
 use std::{
     collections::HashSet,
     env::{self},
@@ -56,30 +57,34 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn dfs(root: NodeRef<Node>, hm: &mut HashSet<String>) {
+    if let Node::Element(e) = root.value() {
+        for (_, v) in e.attrs() {
+            if v.ends_with(".css") || v.ends_with(".js") {
+                hm.insert(v.to_owned());
+            }
+        }
+    }
+    for x in root.children() {
+        dfs(x, hm);
+    }
+}
+
 fn fun_name(selected: &(PathBuf, String)) -> Result<()> {
     let temp_dir = tempdir()?;
     let index_html = temp_dir.path().join("index.html");
     File::create(&index_html)?.write_all(selected.1.as_bytes())?;
-    let mut resources: HashSet<&str> = HashSet::new();
-    let dom = Dom::parse(&selected.1).context("fail to get dom")?;
-    for (k, v) in dom
-        .children
-        .iter()
-        .filter_map(|node| node.element())
-        .flat_map(|element| &element.attributes)
-    {
-        let Some(v) = v else { continue };
-        if (k == "href" || k == "src") && (v.ends_with(".js") || v.ends_with(".css")) {
-            resources.insert(v);
-        }
-    }
+
     let mdd_path = selected.0.with_extension("mdd");
     if let Ok(mut mdd) = Mdx::from(&mdd_path) {
+        let mut resources: HashSet<String> = HashSet::new();
+        let dom = Html::parse_document(&selected.1);
+        dfs(dom.tree.root(), &mut resources);
         for resource in resources {
             let p = {
                 let mut p = selected.0.clone();
                 p.pop();
-                p.push(resource);
+                p.push(&resource);
                 p
             };
             if p.exists() {
@@ -91,7 +96,7 @@ fn fun_name(selected: &(PathBuf, String)) -> Result<()> {
                 continue;
             }
 
-            let mut resource = resource.to_owned();
+            let mut resource = resource;
             if !resource.starts_with('/') {
                 resource = "/".to_owned() + &resource;
             }
