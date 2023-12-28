@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use ego_tree::NodeRef;
 use mdict::Mdx;
+use rayon::prelude::*;
 use scraper::{Html, Node};
+use std::sync::mpsc::channel;
 use std::{
     collections::HashSet,
     env::{self},
@@ -16,21 +18,18 @@ use walkdir::WalkDir;
 fn main() -> Result<()> {
     let word = env::args().nth(1).unwrap();
 
-    let mut dicts = load_dict()
-        .into_iter()
-        .filter_map(|dict| Mdx::from(&dict).map(|m| (dict, m)).ok())
-        .collect::<Vec<_>>();
+    let (sender, receiver) = channel();
 
-    let results: Vec<_> = dicts
-        .iter_mut()
-        .filter_map(|(p, ref mut mdx)| {
-            if let Ok(Some(definition)) = mdx.lookup_as_string(&word) {
-                Some((p.clone(), definition))
-            } else {
-                None
-            }
-        })
-        .collect();
+    load_dict().into_par_iter().for_each_with(sender, |s, p| {
+        let Ok(mut mdx) = Mdx::from(&p) else {
+            return;
+        };
+        if let Ok(Some(definition)) = mdx.lookup_as_string(&word) {
+            s.send((p, definition)).unwrap();
+        }
+    });
+
+    let results: Vec<_> = receiver.iter().collect();
 
     let items: Vec<_> = results.iter().map(|(p, _)| p.to_str().unwrap()).collect();
 
