@@ -119,7 +119,7 @@ fn read_header(reader: &mut Reader, mode: Mode) -> Result<Header> {
                 Encoding::for_label(encoding.as_bytes())
                     .ok_or(Error::InvalidEncoding(encoding.clone()))?
             } else {
-                encoding_rs::UTF_8
+                UTF_8
             }
         }
     };
@@ -234,7 +234,7 @@ fn decode_key_blocks(data: &[u8], header: &Header) -> Result<Vec<BlockEntryInfo>
             Version::V1 => bytes,
             Version::V2 => bytes + 1,
         };
-        if header.encoding == encoding_rs::UTF_8 {
+        if header.encoding != encoding_rs::UTF_16LE {
             text_size
         } else {
             text_size * 2
@@ -331,7 +331,7 @@ fn read_key_blocks(
                 Version::V2 => (BE::read_u64(entries_slice) as usize, 8),
             };
             entries_slice = &entries_slice[delta..];
-            if header.encoding == UTF_8 {
+            if header.encoding != UTF_16LE {
                 let idx = entries_slice
                     .iter()
                     .position(|b| *b == 0)
