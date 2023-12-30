@@ -441,14 +441,14 @@ impl PartialEq<str> for KeyEntry {
 
 impl PartialOrd<str> for KeyEntry {
     fn partial_cmp(&self, word: &str) -> Option<Ordering> {
-        let f = |w: &str| -> String {
+        fn strip_punctuation(w: &str) -> String {
             w.to_lowercase()
                 .chars()
-                .filter(|c| c.is_lowercase())
+                .filter(|c| !c.is_ascii_punctuation() && !c.is_whitespace())
                 .collect()
-        };
+        }
 
-        f(self.text.as_str()).partial_cmp(&f(word))
+        strip_punctuation(self.text.as_str()).partial_cmp(&strip_punctuation(word))
     }
 }
 
